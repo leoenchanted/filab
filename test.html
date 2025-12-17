@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PRO FILM LAB | 移动端暗房</title>
+    <style>
+        :root {
+            --bg-color: #0d0d0d;
+            --card-bg: #1c1c1c;
+            --accent: #bb86fc;
+            --accent-hover: #9965f4;
+            --text-main: #ffffff;
+            --text-sub: #a0a0a0;
+            --success: #03dac6;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px 15px;
+            line-height: 1.6;
+        }
+
+        /* 顶部 */
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #333;
+        }
+        h1 { margin: 0; font-weight: 300; letter-spacing: 3px; font-size: 1.5rem; text-transform: uppercase; }
+        p.subtitle { color: var(--text-sub); margin-top: 5px; font-size: 0.8rem; }
+
+        /* 胶片选择器 (Grid 布局) */
+        .film-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); /* 手机上一行两个，电脑自适应 */
+            gap: 15px;
+            margin-bottom: 30px;
+            max-width: 1000px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .film-card {
+            background: var(--card-bg);
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .film-card.selected {
+            border: 2px solid var(--accent);
+            background: #2b2b2b;
+        }
+        
+        .film-card:active { transform: scale(0.98); }
+
+        .film-name { font-size: 0.9rem; font-weight: bold; color: #fff; margin-bottom: 5px; }
+        .film-tag { 
+            display: inline-block; padding: 2px 6px; border-radius: 4px; 
+            font-size: 0.65rem; background: #333; color: var(--accent);
+        }
+        /* 手机上隐藏详细描述，节省空间 */
+        .film-desc { font-size: 0.75rem; color: var(--text-sub); display: none; margin-top: 8px; text-align: left;}
+        @media (min-width: 768px) {
+            .film-desc { display: block; }
+            .film-grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+            .film-card { text-align: left; padding: 20px; }
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto 30px auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .options-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        select {
+            background: #000;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-direction: column;
+        }
+        @media (min-width: 600px) {
+            .btn-group { flex-direction: row; }
+        }
+
+        .btn {
+            border: none;
+            padding: 14px 20px;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-upload { background: #333; color: #fff; }
+        .btn-process { background: var(--accent); color: #000; }
+        .btn-process:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
+        
+        /* 状态条 */
+        .status-bar {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            text-align: center;
+            min-height: 20px;
+            font-family: monospace;
+        }
+        .timer { color: var(--accent); font-weight: bold; }
+
+        /* 预览区域 */
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        @media (min-width: 768px) {
+            .preview-container { flex-direction: row; }
+        }
+
+        .preview-box {
+            flex: 1;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            min-height: 200px;
+            border: 1px solid #333;
+        }
+        
+        .preview-label {
+            position: absolute; top: 10px; left: 10px;
+            background: rgba(0,0,0,0.6); color: #fff;
+            padding: 4px 8px; border-radius: 4px; font-size: 0.7rem;
+            backdrop-filter: blur(4px);
+            z-index: 2;
+        }
+
+        img { width: 100%; height: auto; display: block; opacity: 0; transition: opacity 0.5s; }
+        img.loaded { opacity: 1; }
+
+        /* 下载按钮 */
+        .download-section {
+            text-align: center;
+            margin-top: 20px;
+            display: none;
+        }
+        .btn-download {
+            background: var(--success);
+            color: #000;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 0 15px rgba(3, 218, 198, 0.3);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0.8); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        /* 加载动画 */
+        .loading-scan {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, transparent, var(--accent), transparent);
+            opacity: 0.2;
+            transform: translateY(-100%);
+            animation: scan 1.5s infinite linear;
+            display: none;
+            pointer-events: none;
+        }
+        @keyframes scan {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Film Lab</h1>
+    <p class="subtitle">Python Computational Photography</p>
+</header>
+
+<div class="film-grid">
+    <div class="film-card selected" onclick="selectFilm(this, 'fuji')">
+        <div class="film-name">Fuji Pro 400H</div>
+        <div class="film-tag">日系 / 通透</div>
+        <div class="film-desc">青色阴影，通透高光，适合风景与人像。</div>
+    </div>
+    <div class="film-card" onclick="selectFilm(this, 'kodak')">
+        <div class="film-name">Kodak Portra</div>
+        <div class="film-tag">人像 / 暖调</div>
+        <div class="film-desc">肤色还原极佳，色调温暖细腻。</div>
+    </div>
+    <div class="film-card" onclick="selectFilm(this, 'cinestill')">
+        <div class="film-name">Cinestill 800T</div>
+        <div class="film-tag">夜景 / 光晕</div>
+        <div class="film-desc">电影感，标志性的红色光晕。</div>
+    </div>
+    <div class="film-card" onclick="selectFilm(this, 'ricoh')">
+        <div class="film-name">Ricoh GR</div>
+        <div class="film-tag">街拍 / 森山</div>
+        <div class="film-desc">高反差，高饱和，粗颗粒黑白。</div>
+    </div>
+    <div class="film-card" onclick="selectFilm(this, 'polaroid')">
+        <div class="film-name">Polaroid</div>
+        <div class="film-tag">复古 / 柔光</div>
+        <div class="film-desc">色调偏黄，黑位浮起，怀旧感。</div>
+    </div>
+    <div class="film-card" onclick="selectFilm(this, 'ilford')">
+        <div class="film-name">Ilford HP5</div>
+        <div class="film-tag">纪实 / 黑白</div>
+        <div class="film-desc">经典黑白卷，银盐颗粒感强。</div>
+    </div>
+</div>
+
+<div class="control-panel">
+    <div class="options-row">
+        <div>
+            <label style="color:#aaa; font-size:0.8rem;">颗粒质感 (Grain):</label>
+            <select id="grainSelect">
+                <option value="off">Off (洁净)</option>
+                <option value="low">Low (柔和)</option>
+                <option value="normal" selected>Normal (标准)</option>
+                <option value="high">High (粗糙)</option>
+            </select>
+        </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*" style="display: none" onchange="handleFileSelect()">
+    
+    <div class="btn-group">
+        <button class="btn btn-upload" onclick="document.getElementById('fileInput').click()">
+            <span>📁</span> 选择照片
+        </button>
+        <button class="btn btn-process" id="processBtn" onclick="processImage()" disabled>
+            <span>⚡</span> 开始冲洗
+        </button>
+    </div>
+
+    <div class="status-bar">
+        <span id="statusText">等待上传照片...</span>
+        <span id="timer" class="timer"></span>
+    </div>
+</div>
+
+<div class="preview-container">
+    <div class="preview-box">
+        <div class="preview-label">Original</div>
+        <img id="imgOriginal">
+    </div>
+    <div class="preview-box">
+        <div class="preview-label">Developed</div>
+        <div class="loading-scan" id="scanEffect"></div>
+        <img id="imgResult">
+    </div>
+</div>
+
+<div class="download-section" id="downloadSection">
+    <a id="downloadLink" class="btn btn-download" href="#" download="film_photo.png">
+        <span>⬇️</span> 保存高清成片
+    </a>
+</div>
+
+<script>
+    let currentStyle = 'fuji';
+    let timerInterval;
+    let startTime;
+
+    function selectFilm(card, style) {
+        document.querySelectorAll('.film-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        currentStyle = style;
+    }
+
+    function handleFileSelect() {
+        const file = document.getElementById('fileInput').files[0];
+        if (file) {
+            const url = URL.createObjectURL(file);
+            const img = document.getElementById('imgOriginal');
+            img.src = url;
+            img.onload = () => img.classList.add('loaded');
+            
+            document.getElementById('processBtn').disabled = false;
+            document.getElementById('statusText').innerText = "照片已就绪，请点击冲洗";
+            document.getElementById('processBtn').style.opacity = "1";
+            
+            // 重置结果区
+            document.getElementById('imgResult').classList.remove('loaded');
+            document.getElementById('imgResult').src = "";
+            document.getElementById('downloadSection').style.display = 'none';
+        }
+    }
+
+    async function processImage() {
+        const fileInput = document.getElementById('fileInput');
+        const grainOpt = document.getElementById('grainSelect').value;
+        const processBtn = document.getElementById('processBtn');
+        const scanEffect = document.getElementById('scanEffect');
+        const statusText = document.getElementById('statusText');
+        const timerDisplay = document.getElementById('timer');
+
+        if (!fileInput.files[0]) return;
+
+        // UI 状态更新
+        processBtn.disabled = true;
+        scanEffect.style.display = 'block';
+        statusText.innerText = "暗房显影中...";
+        
+        // 启动计时器
+        startTime = Date.now();
+        timerDisplay.innerText = "0.0s";
+        timerInterval = setInterval(() => {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            timerDisplay.innerText = elapsed + "s";
+        }, 100);
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('style', currentStyle);
+        formData.append('grain', grainOpt);
+
+        try {
+            const res = await fetch('http://127.0.0.1:5000/process', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) throw new Error("服务器错误");
+
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            
+            const imgRes = document.getElementById('imgResult');
+            imgRes.src = url;
+            imgRes.onload = () => {
+                imgRes.classList.add('loaded');
+                // 图片加载完成后停止动画和计时
+                stopProcessingUI(true);
+                setupDownload(blob);
+            };
+
+        } catch (e) {
+            console.error(e);
+            statusText.innerText = "错误: " + e.message;
+            stopProcessingUI(false);
+        }
+    }
+
+    function stopProcessingUI(success) {
+        clearInterval(timerInterval);
+        document.getElementById('processBtn').disabled = false;
+        document.getElementById('scanEffect').style.display = 'none';
+        
+        if (success) {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+            document.getElementById('statusText').innerText = "冲洗完成！";
+            document.getElementById('timer').innerText = elapsed + "s";
+        } else {
+            document.getElementById('timer').innerText = "";
+        }
+    }
+
+    function setupDownload(blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.getElementById('downloadLink');
+        const section = document.getElementById('downloadSection');
+        
+        // 生成更有意义的文件名: fuji_timestamp.png
+        const timestamp = new Date().getTime();
+        link.href = url;
+        link.download = `${currentStyle}_film_${timestamp}.png`;
+        
+        section.style.display = 'block';
+        // 滚动到底部让用户看到下载按钮
+        section.scrollIntoView({ behavior: 'smooth' });
+    }
+</script>
+
+</body>
+</html>
