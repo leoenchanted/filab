@@ -323,6 +323,13 @@
     function handleFileSelect() {
         const file = document.getElementById('fileInput').files[0];
         if (file) {
+            // --- 新增：大小检测逻辑 ---
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {
+                alert("文件太大了！请上传小于 10MB 的图片，否则服务器会显影失败。");
+                document.getElementById('fileInput').value = ""; // 清空选择
+                return;
+            }
             const url = URL.createObjectURL(file);
             const img = document.getElementById('imgOriginal');
             img.src = url;
@@ -426,4 +433,5 @@
 
 </body>
 </html>
+
 
