@@ -12,7 +12,7 @@ app = Flask(__name__, template_folder='templates')
 CORS(app)
 
 # 限制图片最大边长，防止 Vercel 内存溢出或处理超时
-MAX_IMAGE_SIZE = 1600
+MAX_IMAGE_SIZE = 2500
 
 @app.route('/')
 def index():
@@ -65,8 +65,7 @@ def process_image():
         processed_img = process_style_v2(img, style, grain_scale=grain_scale)
 
         # 6. 将结果转换为字节流
-        # 使用 JPEG 格式返回，质量设为 90
-        _, buffer = cv2.imencode('.jpg', processed_img, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+        _, buffer = cv2.imencode('.png', processed_img)
         io_buf = BytesIO(buffer)
 
         return send_file(
