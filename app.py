@@ -22,6 +22,11 @@ def index():
 @app.route('/health')
 def health():
     return {"status": "ok"}, 200
+@app.route('/favicon.ico')
+def favicon():
+    # 假设 favicon.ico 在 app.py 同级根目录下
+    return send_from_directory(os.path.join(app.root_path),
+                               'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
 @app.route('/process', methods=['POST'])
 def process_image():
