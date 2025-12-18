@@ -1,42 +1,61 @@
 from flask import Flask, request, send_file, jsonify, render_template
 from flask_cors import CORS
+from io import BytesIO
 import numpy as np
 import cv2
-import io
+import os
+
 from film_engine import process_style_v2
 
-# 指向 templates 文件夹
-app = Flask(__name__, template_folder='templates')
+app = Flask(__name__)
 CORS(app)
-app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024 
 
-# 新增：访问根目录直接返回网页
+
 @app.route('/')
-def home():
+def index():
+    """渲染前端页面"""
     return render_template('index.html')
+
+
+@app.route('/health')
+def health():
+    return {"status": "ok"}, 200
+
 
 @app.route('/process', methods=['POST'])
 def process_image():
-    # ... (保持原来的代码不变) ...
-    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
-    file = request.files['file']
-    style = request.form.get('style', 'fuji')
-    grain_opt = request.form.get('grain', 'normal')
-    
-    scale_map = {'off': 0.0, 'low': 0.5, 'normal': 1.0, 'high': 1.5, 'extreme': 2.5}
-    grain_scale = scale_map.get(grain_opt, 1.0)
-    
     try:
+        if 'image' not in request.files:
+            return jsonify({"error": "No image provided"}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({"error": "Empty filename"}), 400
+
         file_bytes = np.frombuffer(file.read(), np.uint8)
         img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        if img is None: return jsonify({"error": "Invalid Image"}), 400
-        processed_img = process_style_v2(img, style, grain_scale)
-        is_success, buffer = cv2.imencode(".png", processed_img)
-        if not is_success: return jsonify({"error": "Encode failed"}), 500
-        return send_file(io.BytesIO(buffer), mimetype='image/png')
+        
+        if img is None:
+            return jsonify({"error": "Invalid image format"}), 400
+
+        style = request.form.get('style', 'kodak')
+
+        processed_img = process_style_v2(img, style)
+
+        _, buffer = cv2.imencode('.jpg', processed_img, [int(cv2.IMWRITE_JPEG_QUALITY), 90])
+        io_buf = BytesIO(buffer)
+
+        return send_file(
+            io_buf,
+            mimetype='image/jpeg',
+            as_attachment=False
+        )
+
     except Exception as e:
-        print(e)
-        return jsonify({"error": str(e)}), 500
+        print(f"[ERROR] {str(e)}")
+        return jsonify({"error": "Processing failed"}), 500
+
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host='0.0.0.0', port=port)
