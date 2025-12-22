@@ -1,64 +1,69 @@
 from flask import Flask, request, send_file, jsonify, render_template, send_from_directory
 from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 from io import BytesIO
 import numpy as np
 import cv2
 import os
-from functools import lru_cache
+import time
+import uuid
 
-from film_engine import process_style_v2
+from film_engine import process_style_v2_with_progress
 
 app = Flask(__name__, template_folder='templates')
-CORS(app)
+app.config['SECRET_KEY'] = 'film_lab_secret_2024'
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# WebSocket 配置
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # ==================== 配置参数 ====================
 
-# 内存优化: 1600px 是画质和内存的黄金平衡点
-MAX_IMAGE_SIZE = 1600
-
-# 输出质量: 95 是肉眼无损的最佳值
+MAX_PIXELS = 4_000_000  
+MAX_DIMENSION = 2400    
 OUTPUT_QUALITY = 95
-
-# 支持的图片格式
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp', 'heic'}
 
 # ==================== 工具函数 ====================
 
 def allowed_file(filename):
-    """检查文件扩展名"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def smart_resize(img, max_size=MAX_IMAGE_SIZE):
-    """
-    智能缩放:
-    - 如果图片小于 max_size,不缩放
-    - 如果大于,按比例缩小
-    - 使用 INTER_AREA 算法(缩小时最佳)
-    """
+def smart_resize_by_pixels(img, max_pixels=MAX_PIXELS, max_dim=MAX_DIMENSION):
     h, w = img.shape[:2]
-    if max(h, w) <= max_size:
-        return img
+    total_pixels = h * w
+    scale = 1.0
     
-    scale = max_size / max(h, w)
-    new_w, new_h = int(w * scale), int(h * scale)
-    return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    if total_pixels > max_pixels:
+        scale = min(scale, np.sqrt(max_pixels / total_pixels))
+    
+    if max(h, w) > max_dim:
+        scale = min(scale, max_dim / max(h, w))
+    
+    if scale < 1.0:
+        new_w = int(w * scale)
+        new_h = int(h * scale)
+        return cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA), scale
+    
+    return img, 1.0
 
-def optimize_image_memory(img):
-    """
-    [新增] 内存优化预处理
-    - 检测异常大的图片
-    - 提前释放不必要的内存
-    """
+def get_image_info(img):
     h, w = img.shape[:2]
-    pixel_count = h * w
-    
-    # 如果超过 4K 分辨率 (800万像素),强制缩小
-    if pixel_count > 8_000_000:
-        scale = np.sqrt(8_000_000 / pixel_count)
-        new_w, new_h = int(w * scale), int(h * scale)
-        img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
-    
-    return img
+    return {
+        "width": w,
+        "height": h,
+        "pixels": w * h,
+        "megapixels": round(w * h / 1_000_000, 2)
+    }
+
+def progress_callback(session_id, step, progress, message):
+    """发送进度到前端"""
+    socketio.emit('progress_update', {
+        'session_id': session_id,
+        'step': step,
+        'progress': progress,
+        'message': message
+    }, namespace='/')
 
 # ==================== 路由 ====================
 
@@ -70,119 +75,153 @@ def index():
 def favicon():
     return send_from_directory(app.root_path, 'favicon.ico')
 
-@app.route('/process', methods=['POST'])
-def process_image():
+@app.route('/analyze', methods=['POST'])
+def analyze_image():
     try:
-        # 1. 参数验证
         if 'file' not in request.files:
             return jsonify({"error": "未上传文件"}), 400
         
         file = request.files['file']
+        file_bytes = np.frombuffer(file.read(), np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return jsonify({"error": "无法解析图片"}), 400
+        
+        h, w = img.shape[:2]
+        original_pixels = h * w
+        
+        resized_img, scale = smart_resize_by_pixels(img)
+        final_h, final_w = resized_img.shape[:2]
+        
+        estimated_time = (final_w * final_h / 1_000_000) * 2.5
+        
+        return jsonify({
+            "original": {"width": w, "height": h, "megapixels": round(original_pixels/1e6, 2)},
+            "processed": {"width": final_w, "height": final_h, "megapixels": round(final_w*final_h/1e6, 2)},
+            "will_resize": scale < 1.0,
+            "resize_ratio": round(scale * 100, 1),
+            "estimated_time": round(estimated_time, 1)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/process', methods=['POST'])
+def process_image():
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "未上传文件"}), 400
+        
+        file = request.files['file']
+        session_id = request.form.get('session_id', str(uuid.uuid4()))
         
         if file.filename == '':
             return jsonify({"error": "文件名为空"}), 400
         
-        # [新增] 文件格式检查
         if not allowed_file(file.filename):
             return jsonify({
-                "error": f"不支持的文件格式。支持的格式: {', '.join(ALLOWED_EXTENSIONS)}"
+                "error": f"不支持的文件格式。支持: {', '.join(ALLOWED_EXTENSIONS)}"
             }), 400
         
-        # 2. 获取参数
         style = request.form.get('style', 'fuji')
         grain_opt = request.form.get('grain', 'normal')
         
-        # 颗粒强度映射
-        grain_map = {
-            'off': 0.0,     # 无颗粒
-            'low': 0.5,     # 低颗粒
-            'normal': 1.0,  # 标准颗粒
-            'high': 1.8     # 高颗粒
-        }
+        grain_map = {'off': 0.0, 'low': 0.5, 'normal': 1.0, 'high': 1.8}
         grain_scale = grain_map.get(grain_opt, 1.0)
         
-        # 3. 读取图片 (内存安全)
+        start_time = time.time()
+        
+        progress_callback(session_id, 'loading', 5, '读取图像数据...')
         file_bytes = np.frombuffer(file.read(), np.uint8)
         img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-        
-        # [优化] 立即释放原始字节
         del file_bytes
         
-        # 4. 格式检查
         if img is None:
-            return jsonify({
-                "error": "无法解析该图片格式。请尝试:\n"
-                        "1. 截屏后重新上传\n"
-                        "2. 手机设置 → 相机 → 格式 → 改为'兼容模式'\n"
-                        "3. 使用第三方 App 转换为 JPEG"
-            }), 400
+            return jsonify({"error": "无法解析图片格式"}), 400
         
-        # 5. [新增] 内存优化预处理
-        img = optimize_image_memory(img)
+        progress_callback(session_id, 'loading', 15, '分析图像信息...')
+        original_info = get_image_info(img)
         
-        # 6. 智能缩放
-        img = smart_resize(img, MAX_IMAGE_SIZE)
+        progress_callback(session_id, 'resize', 20, '优化图像尺寸...')
+        img, scale = smart_resize_by_pixels(img, MAX_PIXELS, MAX_DIMENSION)
+        resized_info = get_image_info(img)
         
-        # 7. 执行胶片处理
-        processed_img = process_style_v2(img, style, grain_scale=grain_scale)
+        progress_callback(session_id, 'processing', 25, '开始胶片处理...')
         
-        # [优化] 释放原图内存
+        def internal_callback(step, progress, message):
+            progress_callback(session_id, step, progress, message)
+        
+        processed_img = process_style_v2_with_progress(
+            img, style, grain_scale, callback=internal_callback
+        )
         del img
         
-        # 8. 高质量编码
+        progress_callback(session_id, 'encoding', 90, '生成高清成片...')
         encode_params = [
             int(cv2.IMWRITE_JPEG_QUALITY), OUTPUT_QUALITY,
-            int(cv2.IMWRITE_JPEG_OPTIMIZE), 1,  # 启用优化
-            int(cv2.IMWRITE_JPEG_PROGRESSIVE), 1  # 渐进式 JPEG (更快加载)
+            int(cv2.IMWRITE_JPEG_OPTIMIZE), 1,
+            int(cv2.IMWRITE_JPEG_PROGRESSIVE), 1
         ]
         
         success, buffer = cv2.imencode('.jpg', processed_img, encode_params)
+        del processed_img
         
         if not success:
             return jsonify({"error": "图片编码失败"}), 500
         
-        # [优化] 释放处理后的图片
-        del processed_img
+        progress_callback(session_id, 'complete', 100, '✨ 冲洗完成!')
         
-        # 9. 返回结果
         io_buf = BytesIO(buffer.tobytes())
         io_buf.seek(0)
         
-        return send_file(
+        processing_time = time.time() - start_time
+        
+        response = send_file(
             io_buf,
             mimetype='image/jpeg',
             as_attachment=True,
             download_name=f'film_{style}_{grain_opt}.jpg'
         )
+        
+        response.headers['X-Processing-Time'] = str(round(processing_time, 2))
+        response.headers['X-Original-Size'] = f"{original_info['width']}x{original_info['height']}"
+        response.headers['X-Processed-Size'] = f"{resized_info['width']}x{resized_info['height']}"
+        response.headers['X-Was-Resized'] = str(scale < 1.0).lower()
+        
+        return response
     
     except MemoryError:
-        return jsonify({
-            "error": "图片过大,服务器内存不足。请尝试:\n"
-                    "1. 压缩图片后重新上传\n"
-                    "2. 使用截图代替原图"
-        }), 507
+        return jsonify({"error": "图片过大,服务器内存不足"}), 507
     
     except Exception as e:
-        # 打印完整错误到日志
         import traceback
         print("=" * 50)
         print(f"Error: {str(e)}")
         print(traceback.format_exc())
         print("=" * 50)
-        
-        return jsonify({
-            "error": f"处理失败: {str(e)}"
-        }), 500
+        return jsonify({"error": f"处理失败: {str(e)}"}), 500
+
+# ==================== WebSocket 事件 ====================
+
+@socketio.on('connect')
+def handle_connect():
+    print(f'✅ Client connected: {request.sid}')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print(f'❌ Client disconnected: {request.sid}')
 
 # ==================== 健康检查 ====================
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """用于 Vercel/Docker 的健康检查"""
     return jsonify({
         "status": "healthy",
-        "max_size": MAX_IMAGE_SIZE,
-        "quality": OUTPUT_QUALITY
+        "max_pixels": MAX_PIXELS,
+        "max_dimension": MAX_DIMENSION,
+        "quality": OUTPUT_QUALITY,
+        "websocket": "enabled"
     }), 200
 
 # ==================== 启动 ====================
@@ -191,9 +230,10 @@ if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     debug_mode = os.environ.get("FLASK_ENV") == "development"
     
-    app.run(
+    socketio.run(
+        app,
         debug=debug_mode,
         host='0.0.0.0',
         port=port,
-        threaded=True  # 启用多线程
+        allow_unsafe_werkzeug=True
     )
