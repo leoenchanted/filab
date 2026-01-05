@@ -1,20 +1,22 @@
-name: Deploy FILAB Application (Manual)
+name: Manual Deploy FILAB
 
 on:
-  workflow_dispatch:  # 👈 手动触发
+  workflow_dispatch:  # 只允许手动触发
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: SSH to server and run deploy
+        uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd /www/wwwroot/filab
-            git config http.version HTTP/1.1
-            git pull origin master
-            sudo systemctl restart gunicorn
+            ./deploy.sh
