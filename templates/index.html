@@ -1,597 +1,215 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="icon" href="/favicon.ico" type="image/x-icon">
-    <title>PRO FILM LAB | 移动端暗房</title>
-    
-    <!-- Socket.IO 客户端 -->
+    <title>PRO FILM LAB | 极简暗房</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
-    
     <style>
-        :root {
-            --bg-color: #0d0d0d;
-            --card-bg: #1c1c1c;
-            --accent: #bb86fc;
-            --text-main: #ffffff;
-            --text-sub: #a0a0a0;
-            --success: #03dac6;
-        }
-
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            margin: 0;
-            padding: 20px 15px;
-            line-height: 1.6;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding-bottom: 20px;
-            border-bottom: 1px solid #333;
-        }
-        h1 { margin: 0; font-weight: 300; letter-spacing: 3px; font-size: 1.5rem; text-transform: uppercase; }
-
-        .film-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 30px;
-            max-width: 1000px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .film-card {
-            background: var(--card-bg);
-            border: 1px solid #333;
-            border-radius: 12px;
-            padding: 15px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-align: center;
-        }
-
-        .film-card.selected {
-            border: 2px solid var(--accent);
-            background: #2b2b2b;
-        }
-        
-        .film-card:active { transform: scale(0.98); }
-
-        .film-name { font-size: 0.9rem; font-weight: bold; margin-bottom: 5px; }
-        .film-tag { 
-            display: inline-block; padding: 2px 6px; border-radius: 4px; 
-            font-size: 0.65rem; background: #333; color: var(--accent);
-        }
-        .film-desc { font-size: 0.75rem; color: var(--text-sub); display: none; margin-top: 8px; text-align: left;}
-        @media (min-width: 768px) {
-            .film-desc { display: block; }
-            .film-grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
-            .film-card { text-align: left; padding: 20px; }
-        }
-
-        .control-panel {
-            background: var(--card-bg);
-            border-radius: 16px;
-            padding: 20px;
-            max-width: 600px;
-            margin: 0 auto 30px auto;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .image-info {
-            background: #2a2a2a;
-            border-left: 3px solid var(--accent);
-            padding: 10px 15px;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            display: none;
-        }
-        .image-info.show { display: block; }
-        .info-row { display: flex; justify-content: space-between; margin: 5px 0; }
-        .info-label { color: var(--text-sub); }
-        .info-value { color: var(--success); font-weight: bold; }
-        .info-warning { color: #ff9800; }
-
-        .options-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        select {
-            background: #000;
-            color: #fff;
-            border: 1px solid #444;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            flex: 1;
-            min-width: 120px;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 10px;
-            flex-direction: column;
-        }
-        @media (min-width: 600px) {
-            .btn-group { flex-direction: row; }
-        }
-
-        .btn {
-            border: none;
-            padding: 14px 20px;
-            border-radius: 50px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            width: 100%;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        .btn-upload { background: #333; color: #fff; }
-        .btn-process { background: var(--accent); color: #000; }
-        .btn-process:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
-        
-        .progress-container {
-            margin-top: 15px;
-            display: none;
-        }
-        .progress-container.show { display: block; }
-        
-        .progress-bar {
-            width: 100%;
-            height: 10px;
-            background: #2a2a2a;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent), var(--success));
-            width: 0%;
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border-radius: 10px;
-            position: relative;
-        }
-        
-        .progress-fill.animating::after {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        /* 部分 Tailwind 无法直接处理的动画和自定义样式 */
+        .shimmer::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
             animation: shimmer 1.5s infinite;
         }
+        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
         
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(200%); }
-        }
+        .selected-card { border: 2px solid #bb86fc !important; background: rgba(187, 134, 252, 0.1) !important; }
         
-        .progress-text {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 8px;
-            font-size: 0.85rem;
-            color: var(--text-sub);
-        }
-        
-        .progress-percent {
-            color: var(--accent);
-            font-weight: bold;
-            font-family: monospace;
-            font-size: 1rem;
-        }
-
-        .status-bar {
-            margin-top: 15px;
-            font-size: 0.85rem;
-            color: var(--text-sub);
-            text-align: center;
-            min-height: 20px;
-        }
-        .timer { color: var(--accent); font-weight: bold; }
-
-        .preview-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-        @media (min-width: 768px) {
-            .preview-container { flex-direction: row; }
-        }
-
-        .preview-box {
-            flex: 1;
-            background: #000;
-            border-radius: 12px;
-            overflow: hidden;
-            position: relative;
-            min-height: 200px;
-            border: 1px solid #333;
-        }
-        
-        .preview-label {
-            position: absolute; top: 10px; left: 10px;
-            background: rgba(0,0,0,0.6); color: #fff;
-            padding: 4px 8px; border-radius: 4px; font-size: 0.7rem;
-            backdrop-filter: blur(4px);
-            z-index: 2;
-        }
-
-        img { width: 100%; height: auto; display: block; opacity: 0; transition: opacity 0.5s; }
-        img.loaded { opacity: 1; }
-
-        .download-section {
-            text-align: center;
-            margin-top: 20px;
-            display: none;
-        }
-        .btn-download {
-            background: var(--success);
-            color: #000;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 14px 20px;
-            border-radius: 50px;
-            font-weight: 600;
-            box-shadow: 0 0 15px rgba(3, 218, 198, 0.3);
-            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes popIn {
-            from { transform: scale(0.8); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-
-        .connection-status {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.7rem;
-            background: #2a2a2a;
-            color: var(--text-sub);
-            z-index: 1000;
-            display: none;
-        }
-        .connection-status.connected {
-            background: rgba(3, 218, 198, 0.2);
-            color: var(--success);
-        }
-        .connection-status.show { display: block; }
-
+        body { background-color: #0d0d0d; -webkit-tap-highlight-color: transparent; }
     </style>
 </head>
-<body>
+<body class="text-gray-100 min-h-screen p-4 md:p-8">
 
-<div class="connection-status" id="connectionStatus">
-    <span id="connectionText">连接中...</span>
-</div>
+    <div id="connectionStatus" class="fixed top-4 right-4 z-50 px-3 py-1 rounded-full bg-zinc-800 text-[10px] text-gray-400 hidden">
+        <span id="connectionText">● 连接中</span>
+    </div>
 
-<header>
-    <h1>Film Lab(Test)</h1>
-</header>
+    <header class="max-w-4xl mx-auto text-center mb-10 border-b border-zinc-800 pb-6">
+        <h1 class="text-2xl md:text-3xl font-light tracking-[0.3em] uppercase">Film Lab <span class="text-xs align-top text-zinc-500 font-sans">Mobile</span></h1>
+    </header>
 
-<div class="film-grid">
-    <div class="film-card selected" onclick="selectFilm(this, 'fuji')">
-        <div class="film-name">Fuji Pro 400H</div>
-        <div class="film-tag">日系 / 通透</div>
-        <div class="film-desc">青色阴影,通透高光,适合风景与人像。</div>
-    </div>
-    <div class="film-card" onclick="selectFilm(this, 'kodak')">
-        <div class="film-name">Kodak Portra</div>
-        <div class="film-tag">人像 / 暖调</div>
-        <div class="film-desc">肤色还原极佳,色调温暖细腻。</div>
-    </div>
-    <div class="film-card" onclick="selectFilm(this, 'cinestill')">
-        <div class="film-name">Cinestill 800T</div>
-        <div class="film-tag">夜景 / 光晕</div>
-        <div class="film-desc">电影感,标志性的红色光晕。</div>
-    </div>
-    <div class="film-card" onclick="selectFilm(this, 'ricoh')">
-        <div class="film-name">Ricoh GR</div>
-        <div class="film-tag">街拍 / 森山</div>
-        <div class="film-desc">高反差,高饱和,粗颗粒黑白。</div>
-    </div>
-    <div class="film-card" onclick="selectFilm(this, 'polaroid')">
-        <div class="film-name">Polaroid</div>
-        <div class="film-tag">复古 / 柔光</div>
-        <div class="film-desc">色调偏黄,黑位浮起,怀旧感。</div>
-    </div>
-    <div class="film-card" onclick="selectFilm(this, 'ilford')">
-        <div class="film-name">Ilford HP5</div>
-        <div class="film-tag">纪实 / 黑白</div>
-        <div class="film-desc">经典黑白卷,银盐颗粒感强。</div>
-    </div>
-</div>
-
-<div class="control-panel">
-    <div class="image-info" id="imageInfo">
-        <div class="info-row">
-            <span class="info-label">原始尺寸:</span>
-            <span class="info-value" id="originalSize">-</span>
+    <main class="max-w-5xl mx-auto">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+            <div onclick="selectFilm(this, 'fuji')" class="film-card selected-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
+                <div class="font-bold text-sm mb-1">Fuji Pro 400H</div>
+                <div class="text-[10px] text-purple-300 bg-purple-900/30 px-2 py-0.5 rounded inline-block">日系 / 通透</div>
+                <p class="text-xs text-zinc-500 mt-2 hidden md:block">青色阴影，通透高光，适合风景与人像。</p>
+            </div>
+            <div onclick="selectFilm(this, 'kodak')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
+                <div class="font-bold text-sm mb-1">Kodak Portra</div>
+                <div class="text-[10px] text-orange-300 bg-orange-900/30 px-2 py-0.5 rounded inline-block">人像 / 暖调</div>
+                <p class="text-xs text-zinc-500 mt-2 hidden md:block">肤色还原极佳，色调温暖细腻。</p>
+            </div>
+            <div onclick="selectFilm(this, 'cinestill')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
+                <div class="font-bold text-sm mb-1">Cinestill 800T</div>
+                <div class="text-[10px] text-cyan-300 bg-cyan-900/30 px-2 py-0.5 rounded inline-block">夜景 / 电影感</div>
+                <p class="text-xs text-zinc-500 mt-2 hidden md:block">标志性的红色光晕，迷人的暗部色调。</p>
+            </div>
+            <div onclick="selectFilm(this, 'ricoh')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
+                <div class="font-bold text-sm mb-1">Ricoh GR</div>
+                <div class="text-[10px] text-gray-300 bg-zinc-700 px-2 py-0.5 rounded inline-block">高反差 / 黑白</div>
+                <p class="text-xs text-zinc-500 mt-2 hidden md:block">致敬森山大道，粗颗粒极致黑白。</p>
+            </div>
+            <div onclick="selectFilm(this, 'polaroid')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
+                <div class="font-bold text-sm mb-1">Polaroid</div>
+                <div class="text-[10px] text-yellow-300 bg-yellow-900/30 px-2 py-0.5 rounded inline-block">复古 / 柔光</div>
+                <p class="text-xs text-zinc-500 mt-2 hidden md:block">怀旧感十足，黑位浮起，色调偏黄。</p>
+            </div>
+            <div onclick="selectFilm(this, 'ilford')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
+                <div class="font-bold text-sm mb-1">Ilford HP5</div>
+                <div class="text-[10px] text-blue-300 bg-blue-900/30 px-2 py-0.5 rounded inline-block">纪实 / 银盐</div>
+                <p class="text-xs text-zinc-500 mt-2 hidden md:block">经典纪实胶片，灰度极其丰富。</p>
+            </div>
         </div>
-        <div class="info-row">
-            <span class="info-label">处理尺寸:</span>
-            <span class="info-value" id="processedSize">-</span>
+
+        <div class="max-w-2xl mx-auto bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-[2rem] p-6 shadow-2xl">
+            <div id="imageInfo" class="hidden animate-in slide-in-from-top duration-300 bg-zinc-800/50 border-l-4 border-purple-500 p-4 rounded-xl mb-6 text-sm">
+                <div class="flex justify-between mb-1"><span class="text-zinc-400">原始尺寸:</span><span id="originalSize" class="text-emerald-400 font-mono">-</span></div>
+                <div class="flex justify-between mb-1"><span class="text-zinc-400">最终尺寸:</span><span id="processedSize" class="text-emerald-400 font-mono">-</span></div>
+                <div class="flex justify-between"><span class="text-zinc-400">预计耗时:</span><span id="estimatedTime" class="text-emerald-400 font-mono">-</span></div>
+            </div>
+
+            <div class="flex items-center gap-4 mb-6">
+                <label class="text-xs text-zinc-400 whitespace-nowrap">颗粒质感 (Grain):</label>
+                <select id="grainSelect" class="w-full bg-black border border-zinc-700 rounded-lg py-2 px-3 text-sm focus:border-purple-500 outline-none transition-all">
+                    <option value="off">Off (洁净)</option>
+                    <option value="low">Low (柔和)</option>
+                    <option value="normal" selected>Normal (标准)</option>
+                    <option value="high">High (粗糙)</option>
+                </select>
+            </div>
+
+            <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect()">
+            <div class="flex flex-col sm:flex-row gap-4">
+                <button onclick="document.getElementById('fileInput').click()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-4 px-6 rounded-full transition-all flex items-center justify-center gap-2">
+                    📸 选择照片
+                </button>
+                <button id="processBtn" onclick="processImage()" disabled class="flex-1 bg-purple-600 disabled:bg-zinc-700 disabled:opacity-50 text-black font-bold py-4 px-6 rounded-full transition-all flex items-center justify-center gap-2">
+                    ⚡ 开始冲洗
+                </button>
+            </div>
+
+            <div id="progressContainer" class="hidden mt-6">
+                <div class="w-full bg-zinc-800 h-2.5 rounded-full overflow-hidden relative">
+                    <div id="progressFill" class="shimmer bg-gradient-to-r from-purple-500 to-emerald-400 h-full w-0 transition-all duration-300"></div>
+                </div>
+                <div class="flex justify-between mt-2 text-[10px] text-zinc-500 tracking-wider">
+                    <span id="progressStatus">准备中...</span>
+                    <span id="progressPercent" class="text-purple-400 font-mono">0%</span>
+                </div>
+            </div>
+
+            <div id="statusText" class="mt-4 text-center text-xs text-zinc-500 min-h-[1rem]">等待上传...</div>
         </div>
-        <div class="info-row">
-            <span class="info-label">预计耗时:</span>
-            <span class="info-value" id="estimatedTime">-</span>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
+            <div class="relative bg-black rounded-2xl overflow-hidden border border-zinc-800 min-h-[300px] flex items-center">
+                <span class="absolute top-3 left-3 bg-black/50 backdrop-blur-md text-[10px] px-2 py-1 rounded z-10 text-zinc-300">Original</span>
+                <img id="imgOriginal" class="w-full opacity-0 transition-opacity duration-500">
+            </div>
+            <div class="relative bg-black rounded-2xl overflow-hidden border border-zinc-800 min-h-[300px] flex items-center">
+                <span class="absolute top-3 left-3 bg-black/50 backdrop-blur-md text-[10px] px-2 py-1 rounded z-10 text-zinc-300">Developed</span>
+                <img id="imgResult" class="w-full opacity-0 transition-opacity duration-500">
+            </div>
         </div>
-    </div>
 
-    <div class="options-row">
-        <div>
-            <label style="color:#aaa; font-size:0.8rem;">颗粒质感 (Grain):</label>
-            <select id="grainSelect">
-                <option value="off">Off (洁净)</option>
-                <option value="low">Low (柔和)</option>
-                <option value="normal" selected>Normal (标准)</option>
-                <option value="high">High (粗糙)</option>
-            </select>
+        <div id="downloadSection" class="hidden text-center mt-10">
+            <a id="downloadLink" href="#" download class="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-4 px-8 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all">
+                <span>⬇️</span> 保存高清成片
+            </a>
         </div>
-    </div>
+    </main>
 
-    <input type="file" id="fileInput" accept="image/*" style="display: none" onchange="handleFileSelect()">
-    
-    <div class="btn-group">
-        <button class="btn btn-upload" onclick="document.getElementById('fileInput').click()">
-            <span>📸</span> 选择照片
-        </button>
-        <button class="btn btn-process" id="processBtn" onclick="processImage()" disabled>
-            <span>⚡</span> 开始冲洗
-        </button>
-    </div>
+    <script>
+        let currentStyle = 'fuji';
+        let sessionId = null;
+        let socket = null;
 
-    <div class="progress-container" id="progressContainer">
-        <div class="progress-bar">
-            <div class="progress-fill animating" id="progressFill"></div>
-        </div>
-        <div class="progress-text">
-            <span id="progressStatus">准备中...</span>
-            <span class="progress-percent" id="progressPercent">0%</span>
-        </div>
-    </div>
-
-    <div class="status-bar">
-        <span id="statusText">等待上传照片...</span>
-    </div>
-</div>
-
-<div class="preview-container">
-    <div class="preview-box">
-        <div class="preview-label">Original</div>
-        <img id="imgOriginal">
-    </div>
-    <div class="preview-box">
-        <div class="preview-label">Developed</div>
-        <img id="imgResult">
-    </div>
-</div>
-
-<div class="download-section" id="downloadSection">
-    <a id="downloadLink" class="btn btn-download" href="#" download="film_photo.jpg">
-        <span>⬇️</span> 保存高清成片
-    </a>
-</div>
-
-<script>
-    let currentStyle = 'fuji';
-    let estimatedTime = 5;
-    let sessionId = null;
-    let socket = null;
-
-    // 初始化 WebSocket
-    function initSocket() {
-        const serverUrl = window.location.origin;
-        socket = io(serverUrl, {
-            transports: ['websocket', 'polling'],
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 5
-        });
-
-        const statusEl = document.getElementById('connectionStatus');
-        const statusText = document.getElementById('connectionText');
-
-        socket.on('connect', () => {
-            console.log('✅ WebSocket 已连接');
-            statusEl.classList.add('show', 'connected');
-            statusText.textContent = '● 实时连接';
-            setTimeout(() => statusEl.classList.remove('show'), 3000);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('❌ WebSocket 已断开');
-            statusEl.classList.add('show');
-            statusEl.classList.remove('connected');
-            statusText.textContent = '○ 连接断开';
-        });
-
-        socket.on('progress_update', (data) => {
-            if (data.session_id === sessionId) {
-                updateProgress(data.progress, data.message);
-            }
-        });
-    }
-
-    window.onload = () => {
-        initSocket();
-    };
-
-    function selectFilm(card, style) {
-        document.querySelectorAll('.film-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        currentStyle = style;
-    }
-
-    async function handleFileSelect() {
-        const file = document.getElementById('fileInput').files[0];
-        if (!file) return;
-
-        const url = URL.createObjectURL(file);
-        const img = document.getElementById('imgOriginal');
-        img.src = url;
-        img.onload = () => img.classList.add('loaded');
-
-        const formData = new FormData();
-        formData.append('file', file);
-
-        try {
-            const res = await fetch('/analyze', { method: 'POST', body: formData });
-            if (res.ok) {
-                const data = await res.json();
-                document.getElementById('imageInfo').classList.add('show');
-                document.getElementById('originalSize').textContent = 
-                    `${data.original.width}×${data.original.height} (${data.original.megapixels}MP)`;
-                
-                if (data.will_resize) {
-                    document.getElementById('processedSize').innerHTML = 
-                        `${data.processed.width}×${data.processed.height} <span class="info-warning">(缩放${data.resize_ratio}%)</span>`;
-                } else {
-                    document.getElementById('processedSize').textContent = 
-                        `${data.processed.width}×${data.processed.height} (无缩放)`;
+        function initSocket() {
+            socket = io(window.location.origin);
+            socket.on('connect', () => {
+                document.getElementById('connectionStatus').classList.remove('hidden');
+                setTimeout(() => document.getElementById('connectionStatus').classList.add('hidden'), 2000);
+            });
+            socket.on('image_analysis', (data) => {
+                if (data.session_id === sessionId) {
+                    document.getElementById('imageInfo').classList.remove('hidden');
+                    document.getElementById('originalSize').textContent = `${data.original.width} × ${data.original.height}`;
+                    document.getElementById('processedSize').textContent = `${data.processed.width} × ${data.processed.height}`;
+                    document.getElementById('estimatedTime').textContent = `${data.estimated_time}s`;
                 }
-                
-                document.getElementById('estimatedTime').textContent = `${data.estimated_time}秒`;
-                estimatedTime = data.estimated_time;
+            });
+            socket.on('progress_update', (data) => {
+                if (data.session_id === sessionId) {
+                    updateProgress(data.progress, data.message);
+                }
+            });
+        }
+
+        window.onload = initSocket;
+
+        function selectFilm(card, style) {
+            document.querySelectorAll('.film-card').forEach(c => c.classList.remove('selected-card'));
+            card.classList.add('selected-card');
+            currentStyle = style;
+        }
+
+        function handleFileSelect() {
+            const file = document.getElementById('fileInput').files[0];
+            if (!file) return;
+            const img = document.getElementById('imgOriginal');
+            img.src = URL.createObjectURL(file);
+            img.onload = () => img.classList.add('opacity-100');
+            document.getElementById('processBtn').disabled = false;
+            document.getElementById('statusText').innerText = "已就绪";
+            document.getElementById('imageInfo').classList.add('hidden');
+            document.getElementById('downloadSection').classList.add('hidden');
+            document.getElementById('imgResult').classList.remove('opacity-100');
+        }
+
+        function updateProgress(progress, message) {
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('progressPercent').textContent = Math.round(progress) + '%';
+            document.getElementById('progressStatus').textContent = message;
+        }
+
+        async function processImage() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) return;
+            sessionId = 'sn_' + Math.random().toString(36).substr(2, 9);
+            document.getElementById('processBtn').disabled = true;
+            document.getElementById('progressContainer').classList.remove('hidden');
+            updateProgress(5, '正在请求服务器...');
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('style', currentStyle);
+            formData.append('grain', document.getElementById('grainSelect').value);
+            formData.append('session_id', sessionId);
+
+            try {
+                const res = await fetch('/process', { method: 'POST', body: formData });
+                const blob = await res.blob();
+                const imgRes = document.getElementById('imgResult');
+                imgRes.src = URL.createObjectURL(blob);
+                imgRes.onload = () => {
+                    imgRes.classList.add('opacity-100');
+                    updateProgress(100, '✨ 处理完成');
+                    document.getElementById('statusText').innerHTML = `✅ 耗时: ${res.headers.get('X-Processing-Time')}s`;
+                    document.getElementById('processBtn').disabled = false;
+                    
+                    const link = document.getElementById('downloadLink');
+                    link.href = imgRes.src;
+                    link.download = `film_${currentStyle}_${Date.now()}.jpg`;
+                    document.getElementById('downloadSection').classList.remove('hidden');
+                };
+            } catch (e) {
+                document.getElementById('statusText').innerText = "❌ 处理失败";
+                document.getElementById('processBtn').disabled = false;
             }
-        } catch (e) {
-            console.error('预分析失败:', e);
         }
-
-        document.getElementById('processBtn').disabled = false;
-        document.getElementById('statusText').innerText = "照片已就绪,请点击冲洗";
-        document.getElementById('imgResult').classList.remove('loaded');
-        document.getElementById('imgResult').src = "";
-        document.getElementById('downloadSection').style.display = 'none';
-    }
-
-    function updateProgress(progress, message) {
-        const progressFill = document.getElementById('progressFill');
-        const progressPercent = document.getElementById('progressPercent');
-        const progressStatus = document.getElementById('progressStatus');
-
-        progressFill.style.width = progress + '%';
-        progressPercent.textContent = Math.round(progress) + '%';
-        progressStatus.textContent = message;
-
-        if (progress >= 100) {
-            progressFill.classList.remove('animating');
-        }
-    }
-
-    async function processImage() {
-        const fileInput = document.getElementById('fileInput');
-        const grainOpt = document.getElementById('grainSelect').value;
-        const processBtn = document.getElementById('processBtn');
-        const statusText = document.getElementById('statusText');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressFill = document.getElementById('progressFill');
-
-        if (!fileInput.files[0]) return;
-
-        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-
-        processBtn.disabled = true;
-        progressContainer.classList.add('show');
-        progressFill.classList.add('animating');
-        statusText.innerText = "";
-
-        updateProgress(0, '准备上传...');
-
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        formData.append('style', currentStyle);
-        formData.append('grain', grainOpt);
-        formData.append('session_id', sessionId);
-
-        try {
-            const res = await fetch('/process', { method: 'POST', body: formData });
-
-            if (!res.ok) {
-                const errorData = await res.json();
-                throw new Error(errorData.error || "服务器错误");
-            }
-
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            
-            const actualTime = res.headers.get('X-Processing-Time');
-            const wasResized = res.headers.get('X-Was-Resized');
-            
-            const imgRes = document.getElementById('imgResult');
-            imgRes.src = url;
-            imgRes.onload = () => {
-                imgRes.classList.add('loaded');
-                completeProcess(actualTime, wasResized === 'true');
-                setupDownload(blob);
-            };
-
-        } catch (e) {
-            console.error(e);
-            statusText.innerHTML = `<span style='color: #ff4d4d;'>❌ ${e.message}</span>`;
-            stopProcess();
-        }
-    }
-
-    function completeProcess(actualTime, wasResized) {
-        updateProgress(100, '✨ 完成!');
-        setTimeout(() => {
-            document.getElementById('progressContainer').classList.remove('show');
-        }, 2000);
-
-        document.getElementById('processBtn').disabled = false;
-        
-        const resizeMsg = wasResized ? ' (已智能优化尺寸)' : '';
-        document.getElementById('statusText').innerHTML = 
-            `✅ 冲洗完成 | 耗时: <span class="timer">${actualTime}s</span>${resizeMsg}`;
-    }
-
-    function stopProcess() {
-        document.getElementById('processBtn').disabled = false;
-        document.getElementById('progressContainer').classList.remove('show');
-        document.getElementById('progressFill').classList.remove('animating');
-    }
-
-    function setupDownload(blob) {
-        const url = URL.createObjectURL(blob);
-        const link = document.getElementById('downloadLink');
-        const section = document.getElementById('downloadSection');
-        
-        const timestamp = new Date().getTime();
-        link.href = url;
-        link.download = `${currentStyle}_film_${timestamp}.jpg`;
-        
-        section.style.display = 'block';
-        section.scrollIntoView({ behavior: 'smooth' });
-    }
-</script>
-
+    </script>
 </body>
 </html>
-
