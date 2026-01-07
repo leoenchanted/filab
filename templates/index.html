@@ -3,210 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>PRO FILM LAB | 极简暗房</title>
+    <title>PRO FILM LAB</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <style>
-        /* 部分 Tailwind 无法直接处理的动画和自定义样式 */
-        .shimmer::after {
-            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            animation: shimmer 1.5s infinite;
-        }
-        @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
-        
         .selected-card { border: 2px solid #bb86fc !important; background: rgba(187, 134, 252, 0.1) !important; }
-        
-        body { background-color: #0d0d0d; -webkit-tap-highlight-color: transparent; }
+        .shimmer::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); animation: shim 1.5s infinite; }
+        @keyframes shim { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
     </style>
 </head>
-<body class="text-gray-100 min-h-screen p-4 md:p-8">
+<body class="bg-[#0a0a0a] text-zinc-100 min-h-screen p-4 pb-20">
 
-    <div id="connectionStatus" class="fixed top-4 right-4 z-50 px-3 py-1 rounded-full bg-zinc-800 text-[10px] text-gray-400 hidden">
-        <span id="connectionText">● 连接中</span>
-    </div>
-
-    <header class="max-w-4xl mx-auto text-center mb-10 border-b border-zinc-800 pb-6">
-        <h1 class="text-2xl md:text-3xl font-light tracking-[0.3em] uppercase">Film Lab <span class="text-xs align-top text-zinc-500 font-sans">Mobile</span></h1>
+    <header class="py-8 text-center border-b border-zinc-900 mb-8">
+        <h1 class="text-xl tracking-[0.4em] font-light">PRO FILM LAB</h1>
     </header>
 
-    <main class="max-w-5xl mx-auto">
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-            <div onclick="selectFilm(this, 'fuji')" class="film-card selected-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
-                <div class="font-bold text-sm mb-1">Fuji Pro 400H</div>
-                <div class="text-[10px] text-purple-300 bg-purple-900/30 px-2 py-0.5 rounded inline-block">日系 / 通透</div>
-                <p class="text-xs text-zinc-500 mt-2 hidden md:block">青色阴影，通透高光，适合风景与人像。</p>
+    <main class="max-w-4xl mx-auto">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
+            <div onclick="selectFilm(this, 'fuji')" class="film-card selected-card bg-zinc-900 p-4 rounded-xl border border-zinc-800 cursor-pointer">
+                <div class="text-sm font-bold">Fuji 400H</div>
+                <div class="text-[10px] text-purple-400">日系通透</div>
             </div>
-            <div onclick="selectFilm(this, 'kodak')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
-                <div class="font-bold text-sm mb-1">Kodak Portra</div>
-                <div class="text-[10px] text-orange-300 bg-orange-900/30 px-2 py-0.5 rounded inline-block">人像 / 暖调</div>
-                <p class="text-xs text-zinc-500 mt-2 hidden md:block">肤色还原极佳，色调温暖细腻。</p>
+            <div onclick="selectFilm(this, 'kodak')" class="film-card bg-zinc-900 p-4 rounded-xl border border-zinc-800 cursor-pointer">
+                <div class="text-sm font-bold">Portra 400</div>
+                <div class="text-[10px] text-orange-400">温暖肤色</div>
             </div>
-            <div onclick="selectFilm(this, 'cinestill')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
-                <div class="font-bold text-sm mb-1">Cinestill 800T</div>
-                <div class="text-[10px] text-cyan-300 bg-cyan-900/30 px-2 py-0.5 rounded inline-block">夜景 / 电影感</div>
-                <p class="text-xs text-zinc-500 mt-2 hidden md:block">标志性的红色光晕，迷人的暗部色调。</p>
+            <div onclick="selectFilm(this, 'cinestill')" class="film-card bg-zinc-900 p-4 rounded-xl border border-zinc-800 cursor-pointer">
+                <div class="text-sm font-bold">800T</div>
+                <div class="text-[10px] text-cyan-400">电影夜景</div>
             </div>
-            <div onclick="selectFilm(this, 'ricoh')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
-                <div class="font-bold text-sm mb-1">Ricoh GR</div>
-                <div class="text-[10px] text-gray-300 bg-zinc-700 px-2 py-0.5 rounded inline-block">高反差 / 黑白</div>
-                <p class="text-xs text-zinc-500 mt-2 hidden md:block">致敬森山大道，粗颗粒极致黑白。</p>
+            <div onclick="selectFilm(this, 'ricoh')" class="film-card bg-zinc-900 p-4 rounded-xl border border-zinc-800 cursor-pointer">
+                <div class="text-sm font-bold">Ricoh GR</div>
+                <div class="text-[10px] text-zinc-400">森山黑白</div>
             </div>
-            <div onclick="selectFilm(this, 'polaroid')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
-                <div class="font-bold text-sm mb-1">Polaroid</div>
-                <div class="text-[10px] text-yellow-300 bg-yellow-900/30 px-2 py-0.5 rounded inline-block">复古 / 柔光</div>
-                <p class="text-xs text-zinc-500 mt-2 hidden md:block">怀旧感十足，黑位浮起，色调偏黄。</p>
+            <div onclick="selectFilm(this, 'polaroid')" class="film-card bg-zinc-900 p-4 rounded-xl border border-zinc-800 cursor-pointer">
+                <div class="text-sm font-bold">Polaroid</div>
+                <div class="text-[10px] text-yellow-500">复古怀旧</div>
             </div>
-            <div onclick="selectFilm(this, 'ilford')" class="film-card bg-zinc-900 border border-zinc-800 p-4 rounded-2xl cursor-pointer hover:bg-zinc-800 transition-all">
-                <div class="font-bold text-sm mb-1">Ilford HP5</div>
-                <div class="text-[10px] text-blue-300 bg-blue-900/30 px-2 py-0.5 rounded inline-block">纪实 / 银盐</div>
-                <p class="text-xs text-zinc-500 mt-2 hidden md:block">经典纪实胶片，灰度极其丰富。</p>
+            <div onclick="selectFilm(this, 'ilford')" class="film-card bg-zinc-900 p-4 rounded-xl border border-zinc-800 cursor-pointer">
+                <div class="text-sm font-bold">HP5 Plus</div>
+                <div class="text-[10px] text-blue-400">经典黑白</div>
             </div>
         </div>
 
-        <div class="max-w-2xl mx-auto bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-[2rem] p-6 shadow-2xl">
-            <div id="imageInfo" class="hidden animate-in slide-in-from-top duration-300 bg-zinc-800/50 border-l-4 border-purple-500 p-4 rounded-xl mb-6 text-sm">
-                <div class="flex justify-between mb-1"><span class="text-zinc-400">原始尺寸:</span><span id="originalSize" class="text-emerald-400 font-mono">-</span></div>
-                <div class="flex justify-between mb-1"><span class="text-zinc-400">最终尺寸:</span><span id="processedSize" class="text-emerald-400 font-mono">-</span></div>
-                <div class="flex justify-between"><span class="text-zinc-400">预计耗时:</span><span id="estimatedTime" class="text-emerald-400 font-mono">-</span></div>
+        <div class="bg-zinc-900 rounded-3xl p-6 border border-zinc-800 shadow-xl">
+            <div id="imageInfo" class="hidden bg-black/40 p-4 rounded-xl mb-6 text-xs border-l-2 border-purple-500 space-y-2">
+                <div class="flex justify-between"><span>原始分辨率</span><span id="originalSize" class="text-zinc-400 font-mono"></span></div>
+                <div class="flex justify-between"><span>处理分辨率</span><span id="processedSize" class="text-emerald-500 font-mono"></span></div>
+                <div class="flex justify-between"><span>预计时间</span><span id="estimatedTime" class="text-emerald-500 font-mono"></span></div>
             </div>
 
             <div class="flex items-center gap-4 mb-6">
-                <label class="text-xs text-zinc-400 whitespace-nowrap">颗粒质感 (Grain):</label>
-                <select id="grainSelect" class="w-full bg-black border border-zinc-700 rounded-lg py-2 px-3 text-sm focus:border-purple-500 outline-none transition-all">
-                    <option value="off">Off (洁净)</option>
-                    <option value="low">Low (柔和)</option>
-                    <option value="normal" selected>Normal (标准)</option>
-                    <option value="high">High (粗糙)</option>
+                <label class="text-xs text-zinc-500">颗粒强度</label>
+                <select id="grainSelect" class="flex-1 bg-black border border-zinc-800 rounded-lg p-2 text-sm outline-none focus:border-purple-500">
+                    <option value="off">Off</option><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option>
                 </select>
             </div>
 
             <input type="file" id="fileInput" accept="image/*" class="hidden" onchange="handleFileSelect()">
-            <div class="flex flex-col sm:flex-row gap-4">
-                <button onclick="document.getElementById('fileInput').click()" class="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-bold py-4 px-6 rounded-full transition-all flex items-center justify-center gap-2">
-                    📸 选择照片
-                </button>
-                <button id="processBtn" onclick="processImage()" disabled class="flex-1 bg-purple-600 disabled:bg-zinc-700 disabled:opacity-50 text-black font-bold py-4 px-6 rounded-full transition-all flex items-center justify-center gap-2">
-                    ⚡ 开始冲洗
-                </button>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('fileInput').click()" class="flex-1 py-4 bg-zinc-800 rounded-full font-bold text-sm">选择照片</button>
+                <button id="processBtn" disabled onclick="processImage()" class="flex-1 py-4 bg-purple-600 disabled:bg-zinc-800 disabled:text-zinc-600 rounded-full font-bold text-sm text-black transition-all">开始冲洗</button>
             </div>
 
-            <div id="progressContainer" class="hidden mt-6">
-                <div class="w-full bg-zinc-800 h-2.5 rounded-full overflow-hidden relative">
-                    <div id="progressFill" class="shimmer bg-gradient-to-r from-purple-500 to-emerald-400 h-full w-0 transition-all duration-300"></div>
+            <div id="progressContainer" class="hidden mt-8">
+                <div class="h-1.5 w-full bg-black rounded-full overflow-hidden relative">
+                    <div id="progressFill" class="h-full bg-gradient-to-r from-purple-500 to-emerald-400 w-0 transition-all duration-300 shimmer relative"></div>
                 </div>
-                <div class="flex justify-between mt-2 text-[10px] text-zinc-500 tracking-wider">
-                    <span id="progressStatus">准备中...</span>
-                    <span id="progressPercent" class="text-purple-400 font-mono">0%</span>
+                <div class="flex justify-between mt-3 text-[10px] tracking-widest text-zinc-500 uppercase">
+                    <span id="progressStatus">Ready</span>
+                    <span id="progressPercent" class="text-purple-400">0%</span>
                 </div>
             </div>
-
-            <div id="statusText" class="mt-4 text-center text-xs text-zinc-500 min-h-[1rem]">等待上传...</div>
+            <div id="statusText" class="mt-4 text-center text-[10px] text-zinc-600"></div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
-            <div class="relative bg-black rounded-2xl overflow-hidden border border-zinc-800 min-h-[300px] flex items-center">
-                <span class="absolute top-3 left-3 bg-black/50 backdrop-blur-md text-[10px] px-2 py-1 rounded z-10 text-zinc-300">Original</span>
-                <img id="imgOriginal" class="w-full opacity-0 transition-opacity duration-500">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
+            <div class="aspect-square bg-zinc-950 rounded-2xl border border-zinc-900 overflow-hidden relative">
+                <img id="imgOriginal" class="w-full h-full object-contain opacity-0 transition-opacity">
+                <div class="absolute top-2 left-2 px-2 py-1 bg-black/60 text-[8px] rounded">BEFORE</div>
             </div>
-            <div class="relative bg-black rounded-2xl overflow-hidden border border-zinc-800 min-h-[300px] flex items-center">
-                <span class="absolute top-3 left-3 bg-black/50 backdrop-blur-md text-[10px] px-2 py-1 rounded z-10 text-zinc-300">Developed</span>
-                <img id="imgResult" class="w-full opacity-0 transition-opacity duration-500">
+            <div class="aspect-square bg-zinc-950 rounded-2xl border border-zinc-900 overflow-hidden relative">
+                <img id="imgResult" class="w-full h-full object-contain opacity-0 transition-opacity">
+                <div class="absolute top-2 left-2 px-2 py-1 bg-black/60 text-[8px] rounded">AFTER</div>
             </div>
         </div>
 
-        <div id="downloadSection" class="hidden text-center mt-10">
-            <a id="downloadLink" href="#" download class="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold py-4 px-8 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.3)] transition-all">
-                <span>⬇️</span> 保存高清成片
-            </a>
+        <div id="downloadSection" class="hidden mt-8 text-center">
+            <a id="downloadLink" href="#" download class="inline-block bg-emerald-500 text-black px-10 py-4 rounded-full font-bold shadow-lg shadow-emerald-500/20">保存成片</a>
         </div>
     </main>
 
     <script>
         let currentStyle = 'fuji';
         let sessionId = null;
-        let socket = null;
+        const socket = io();
 
-        function initSocket() {
-            socket = io(window.location.origin);
-            socket.on('connect', () => {
-                document.getElementById('connectionStatus').classList.remove('hidden');
-                setTimeout(() => document.getElementById('connectionStatus').classList.add('hidden'), 2000);
-            });
-            socket.on('image_analysis', (data) => {
-                if (data.session_id === sessionId) {
-                    document.getElementById('imageInfo').classList.remove('hidden');
-                    document.getElementById('originalSize').textContent = `${data.original.width} × ${data.original.height}`;
-                    document.getElementById('processedSize').textContent = `${data.processed.width} × ${data.processed.height}`;
-                    document.getElementById('estimatedTime').textContent = `${data.estimated_time}s`;
-                }
-            });
-            socket.on('progress_update', (data) => {
-                if (data.session_id === sessionId) {
-                    updateProgress(data.progress, data.message);
-                }
-            });
-        }
+        socket.on('image_analysis', data => {
+            if(data.session_id !== sessionId) return;
+            document.getElementById('imageInfo').classList.remove('hidden');
+            document.getElementById('originalSize').innerText = `${data.original.width}x${data.original.height}`;
+            document.getElementById('processedSize').innerText = `${data.processed.width}x${data.processed.height}`;
+            document.getElementById('estimatedTime').innerText = `${data.estimated_time}s`;
+        });
 
-        window.onload = initSocket;
+        socket.on('progress_update', data => {
+            if(data.session_id !== sessionId) return;
+            document.getElementById('progressFill').style.width = data.progress + '%';
+            document.getElementById('progressPercent').innerText = data.progress + '%';
+            document.getElementById('progressStatus').innerText = data.message;
+        });
 
-        function selectFilm(card, style) {
+        function selectFilm(el, style) {
             document.querySelectorAll('.film-card').forEach(c => c.classList.remove('selected-card'));
-            card.classList.add('selected-card');
+            el.classList.add('selected-card');
             currentStyle = style;
         }
 
         function handleFileSelect() {
             const file = document.getElementById('fileInput').files[0];
-            if (!file) return;
-            const img = document.getElementById('imgOriginal');
-            img.src = URL.createObjectURL(file);
-            img.onload = () => img.classList.add('opacity-100');
+            if(!file) return;
+            document.getElementById('imgOriginal').src = URL.createObjectURL(file);
+            document.getElementById('imgOriginal').classList.add('opacity-100');
             document.getElementById('processBtn').disabled = false;
-            document.getElementById('statusText').innerText = "已就绪";
             document.getElementById('imageInfo').classList.add('hidden');
             document.getElementById('downloadSection').classList.add('hidden');
             document.getElementById('imgResult').classList.remove('opacity-100');
         }
 
-        function updateProgress(progress, message) {
-            document.getElementById('progressFill').style.width = progress + '%';
-            document.getElementById('progressPercent').textContent = Math.round(progress) + '%';
-            document.getElementById('progressStatus').textContent = message;
-        }
-
         async function processImage() {
-            const fileInput = document.getElementById('fileInput');
-            if (!fileInput.files[0]) return;
-            sessionId = 'sn_' + Math.random().toString(36).substr(2, 9);
+            const file = document.getElementById('fileInput').files[0];
+            sessionId = 'id_' + Date.now();
+            
             document.getElementById('processBtn').disabled = true;
             document.getElementById('progressContainer').classList.remove('hidden');
-            updateProgress(5, '正在请求服务器...');
-
-            const formData = new FormData();
-            formData.append('file', fileInput.files[0]);
-            formData.append('style', currentStyle);
-            formData.append('grain', document.getElementById('grainSelect').value);
-            formData.append('session_id', sessionId);
+            
+            const fd = new FormData();
+            fd.append('file', file);
+            fd.append('style', currentStyle);
+            fd.append('grain', document.getElementById('grainSelect').value);
+            fd.append('session_id', sessionId);
 
             try {
-                const res = await fetch('/process', { method: 'POST', body: formData });
+                const res = await fetch('/process', { method: 'POST', body: fd });
                 const blob = await res.blob();
-                const imgRes = document.getElementById('imgResult');
-                imgRes.src = URL.createObjectURL(blob);
-                imgRes.onload = () => {
-                    imgRes.classList.add('opacity-100');
-                    updateProgress(100, '✨ 处理完成');
-                    document.getElementById('statusText').innerHTML = `✅ 耗时: ${res.headers.get('X-Processing-Time')}s`;
+                const url = URL.createObjectURL(blob);
+                
+                const img = document.getElementById('imgResult');
+                img.src = url;
+                img.onload = () => {
+                    img.classList.add('opacity-100');
+                    document.getElementById('statusText').innerText = `处理完成 | 耗时 ${res.headers.get('X-Processing-Time')}s`;
                     document.getElementById('processBtn').disabled = false;
-                    
-                    const link = document.getElementById('downloadLink');
-                    link.href = imgRes.src;
-                    link.download = `film_${currentStyle}_${Date.now()}.jpg`;
+                    document.getElementById('downloadLink').href = url;
+                    document.getElementById('downloadLink').download = `film_${Date.now()}.jpg`;
                     document.getElementById('downloadSection').classList.remove('hidden');
-                };
-            } catch (e) {
-                document.getElementById('statusText').innerText = "❌ 处理失败";
+                }
+            } catch(e) {
+                alert('处理失败');
                 document.getElementById('processBtn').disabled = false;
             }
         }
