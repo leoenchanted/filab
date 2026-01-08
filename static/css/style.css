@@ -1,0 +1,63 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #000;
+    -webkit-font-smoothing: antialiased;
+}
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* === 滑块风格 (保持 v10) === */
+.slider-container { display: flex; align-items: center; gap: 16px; height: 40px; }
+.slider-label { width: 60px; font-size: 11px; font-weight: 600; color: #888; text-align: left; }
+.slider-value { width: 30px; font-size: 11px; font-weight: 400; color: #fff; text-align: right; font-variant-numeric: tabular-nums; }
+
+input[type=range] { -webkit-appearance: none; background: transparent; flex: 1; height: 30px; cursor: grab; }
+input[type=range]:focus { outline: none; }
+input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #333; border-radius: 2px; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #FF4500; margin-top: -8px; box-shadow: 0 0 10px rgba(255, 69, 0, 0.4); transition: transform 0.1s; border: 2px solid #000; }
+input[type=range]:active::-webkit-slider-thumb { transform: scale(1.2); box-shadow: 0 0 15px rgba(255, 69, 0, 0.6); }
+
+/* === 丝滑面板切换核心 CSS === */
+.panel-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.control-panel {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: #111; /* 保持背景色一致，防止透视 */
+}
+
+/* 激活态 */
+.control-panel.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+    z-index: 10;
+}
+
+/* 隐藏态 */
+.control-panel.hidden-panel {
+    opacity: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+/* Film 往左退，Adjust 往右退，制造滑动感 */
+#panelPresets.hidden-panel { transform: translateX(-20px); }
+#panelAdjust.hidden-panel { transform: translateX(20px); }
+
+/* === Tabs === */
+.adjust-tab { padding: 6px 16px; border-radius: 20px; font-size: 11px; font-weight: 600; color: #666; transition: all 0.2s; white-space: nowrap; }
+.adjust-tab.active { background-color: #FF4500; color: #fff; }
+
+.film-item { transition: transform 0.2s, opacity 0.2s; opacity: 0.5; transform: scale(0.95); }
+.film-item.active { opacity: 1; transform: scale(1.05); }
+.film-item.active img { border: 1px solid #FF4500; }
