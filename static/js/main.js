@@ -1,4 +1,10 @@
-const FILMS = { "All": [], "Fuji": [{ id: 'fuji', name: 'Pro 400H', img: 'fuji_pro400h.png' }], "Kodak": [{ id: 'kodak', name: 'Portra 400', img: 'kodak_portra400.png' }, { id: 'cinestill', name: 'CineStill 800T', img: 'cinestill_800t.png' }], "B&W": [{ id: 'ilford', name: 'Ilford HP5', img: 'ilford_hp5.png' }, { id: 'ricoh', name: 'Ricoh GR', img: 'ricoh_gr.png' }], "Vintage": [{ id: 'polaroid', name: 'Polaroid', img: 'polaroid.png' }] };
+const FILMS = {
+    "All": [], 
+    "Fuji": [{ id: 'fuji', name: 'Pro 400H', img: 'fuji_pro400h.png' }],
+    "Kodak": [{ id: 'kodak', name: 'Portra 400', img: 'kodak_portra400.png' }, { id: 'cinestill', name: 'CineStill 800T', img: 'cinestill_800t.png' }],
+    "B&W": [{ id: 'ilford', name: 'Ilford HP5', img: 'ilford_hp5.png' }, { id: 'ricoh', name: 'Ricoh GR', img: 'ricoh_gr.png' }],
+    "Vintage": [{ id: 'polaroid', name: 'Polaroid', img: 'polaroid.png' }]
+};
 Object.keys(FILMS).forEach(k => { if(k !== "All") FILMS["All"].push(...FILMS[k]); });
 
 const MAX_UPLOAD_MP = 12.0;
@@ -21,7 +27,7 @@ const app = {
         this.renderFilmStrip();
         this.setupListeners();
         this.gl = new WebGLProcessor(document.getElementById('glCanvas'));
-        this.switchAdjustCat('color'); // 默认选中 Color 组
+        this.switchAdjustCat('color');
         
         document.querySelectorAll('input[type=range]').forEach(inp => {
             inp.addEventListener('dblclick', () => {
@@ -92,18 +98,18 @@ const app = {
         }
     },
 
-    // 核心 UI 切换逻辑
+    // ★★★ 核心切换逻辑修复 ★★★
     switchMode(mode) {
         const pFilm = document.getElementById('panelPresets');
         const pAdjust = document.getElementById('panelAdjust');
         const indicator = document.getElementById('tabIndicator');
-        const btnFilm = document.getElementById('btn_film');
-        const btnAdjust = document.getElementById('btn_adjust');
+        const btnFilm = document.getElementById('modePresets');
+        const btnAdjust = document.getElementById('modeAdjust');
 
         if(mode === 'adjust') {
             if(!this.images.original.src) return;
             
-            // 使用 CSS 类切换而不是 display:none
+            // CSS Class 切换
             pFilm.classList.remove('active');
             pFilm.classList.add('hidden-panel');
             
@@ -193,12 +199,10 @@ const app = {
             this.images.film.onload = () => {
                 this.state.isProcessed = true;
                 this.gl.uploadTexture(1, this.images.film);
-                
                 this.state.params.opacity = 100;
                 this.updateText('val_opacity', '100');
                 const opRange = document.querySelector('input[data-param="opacity"]');
                 if(opRange) opRange.value = 100;
-
                 modal.classList.add('hidden'); modal.classList.remove('flex');
                 document.body.style.pointerEvents = 'auto';
                 this.requestRender();
