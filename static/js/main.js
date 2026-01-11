@@ -1,3 +1,4 @@
+// ==================== 胶片数据 ====================
 const FILMS = {
     "All": [], 
     "Fuji": [{ id: 'fuji', name: 'Pro 400H', img: 'fuji_pro400h.png' }],
@@ -7,7 +8,8 @@ const FILMS = {
 };
 Object.keys(FILMS).forEach(k => { if(k !== "All") FILMS["All"].push(...FILMS[k]); });
 
-const MAX_UPLOAD_MP = 12.0;
+// ★★★ 修改1: 提升至 3200万像素，保证绝大多数照片不缩像素 ★★★
+const MAX_UPLOAD_MP = 12;
 
 const app = {
     state: {
@@ -98,7 +100,6 @@ const app = {
         }
     },
 
-    // ★★★ 核心切换逻辑修复 ★★★
     switchMode(mode) {
         const pFilm = document.getElementById('panelPresets');
         const pAdjust = document.getElementById('panelAdjust');
@@ -109,7 +110,6 @@ const app = {
         if(mode === 'adjust') {
             if(!this.images.original.src) return;
             
-            // CSS Class 切换
             pFilm.classList.remove('active');
             pFilm.classList.add('hidden-panel');
             
@@ -149,22 +149,42 @@ const app = {
             const mp = (w * h / 1e6);
             this.updateText('stat_in', `${w}×${h}`);
 
+            // ★★★ 修改2: 统一使用 Canvas 进行格式转换 (PNG -> JPG 0.8) ★★★
+            // 无论图片是否超过阈值，都进行一次 "无损像素 + 0.8质量" 的转换
+            // 这样既保证了像素尺寸不变，又大幅降低了文件体积 (MB)
+            
+            let targetW = w;
+            let targetH = h;
+
+            // 只有当图片真的大到离谱 (>3200万像素) 时才缩放像素，防止服务器内存溢出
             if (mp > MAX_UPLOAD_MP) {
                 const scale = Math.sqrt(MAX_UPLOAD_MP / mp);
-                const tW = Math.floor(w * scale), tH = Math.floor(h * scale);
-                const cvs = document.createElement('canvas'); cvs.width = tW; cvs.height = tH;
-                cvs.getContext('2d').drawImage(this.images.original, 0, 0, tW, tH);
-                cvs.toBlob(b => { 
-                    this.uploadBlob = b; 
-                    const nMp = (tW*tH/1e6).toFixed(1);
-                    this.updateText('stat_out', `${tW}×${tH}`);
-                    this.updateText('stat_time', (nMp*0.5+1).toFixed(1));
-                }, 'image/jpeg', 0.95);
-            } else {
-                this.uploadBlob = file; 
-                this.updateText('stat_out', "ORIG");
-                this.updateText('stat_time', (mp*0.5+1).toFixed(1));
+                targetW = Math.floor(w * scale);
+                targetH = Math.floor(h * scale);
             }
+
+            const cvs = document.createElement('canvas');
+            cvs.width = targetW;
+            cvs.height = targetH;
+            const ctx = cvs.getContext('2d');
+            ctx.drawImage(this.images.original, 0, 0, targetW, targetH);
+            
+            // 导出为 0.8 质量的 JPEG
+            cvs.toBlob(b => { 
+                this.uploadBlob = b; 
+                const nMp = (targetW*targetH/1e6).toFixed(1);
+                
+                // 更新 UI
+                if (mp > MAX_UPLOAD_MP) {
+                    this.updateText('stat_out', `${targetW}×${targetH}`);
+                } else {
+                    this.updateText('stat_out', "ORIG (HQ)");
+                }
+                
+                // 估算时间 (0.8质量上传很快，但后端处理大像素需要时间，调整系数)
+                this.updateText('stat_time', (nMp * 0.8 + 2.0).toFixed(1));
+                
+            }, 'image/jpeg', 0.8); // <--- 这里设为 0.8
 
             this.gl.uploadTexture(0, this.images.original);
             this.gl.uploadTexture(1, this.images.original);
