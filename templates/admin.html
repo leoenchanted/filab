@@ -27,6 +27,7 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      /* 让输入框自动填充时也保持黑色背景 */
       input:-webkit-autofill,
       input:-webkit-autofill:hover,
       input:-webkit-autofill:focus {
@@ -37,13 +38,13 @@
     </style>
   </head>
   <body class="bg-black text-gray-300 font-mono min-h-screen flex flex-col">
-    <!-- 逻辑判断：如果 show_login 为真，显示登录框 -->
+    <!-- ==================== 状态 1: 显示登录框 ==================== -->
     {% if show_login %}
     <div class="flex-1 flex items-center justify-center p-6">
       <div
         class="w-full max-w-md bg-panel border border-border p-8 shadow-2xl relative overflow-hidden"
       >
-        <!-- 装饰线 -->
+        <!-- 顶部橙色光条 -->
         <div
           class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent opacity-50"
         ></div>
@@ -53,28 +54,30 @@
             SECURE ACCESS
           </h1>
           <p class="text-[10px] text-gray-600 uppercase">
-            Authorized Personnel Only
+            Identity Verification Required
           </p>
         </div>
 
+        <!-- 错误提示 -->
         {% if error %}
         <div
-          class="mb-6 bg-red-900/20 border border-red-900 text-red-500 text-xs p-3 text-center tracking-wider"
+          class="mb-6 bg-red-900/20 border border-red-900 text-red-500 text-xs p-3 text-center tracking-wider animate-pulse"
         >
           ⚠️ {{ error }}
         </div>
         {% endif %}
 
+        <!-- 登录表单 -->
         <form method="POST" action="/admin" class="space-y-6">
           <div class="space-y-1">
             <label class="text-[10px] text-gray-500 uppercase tracking-wider"
-              >Identity</label
+              >Username</label
             >
             <input
               type="text"
               name="username"
-              class="w-full bg-black border border-border px-4 py-3 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors placeholder-gray-800"
-              placeholder="ENTER USERNAME"
+              class="w-full bg-black border border-border px-4 py-3 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors placeholder-gray-600"
+              placeholder="ENTER IDENTITY"
               autocomplete="off"
               required
             />
@@ -82,13 +85,13 @@
 
           <div class="space-y-1">
             <label class="text-[10px] text-gray-500 uppercase tracking-wider"
-              >Passcode</label
+              >Password</label
             >
             <input
               type="password"
               name="password"
-              class="w-full bg-black border border-border px-4 py-3 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors placeholder-gray-800"
-              placeholder="ENTER PASSWORD"
+              class="w-full bg-black border border-border px-4 py-3 text-sm text-gray-200 focus:outline-none focus:border-accent transition-colors placeholder-gray-600"
+              placeholder="ENTER ACCESS CODE"
               required
             />
           </div>
@@ -97,17 +100,17 @@
             type="submit"
             class="w-full bg-white text-black font-bold py-3 text-xs tracking-[0.15em] hover:bg-accent transition-colors uppercase"
           >
-            Authenticate
+            LOGIN SYSTEM
           </button>
         </form>
       </div>
     </div>
 
-    <!-- 逻辑判断：否则（已登录），显示数据面板 -->
+    <!-- ==================== 状态 2: 显示数据表格 ==================== -->
     {% else %}
     <div class="flex-1 p-6">
-      <div class="max-w-6xl mx-auto">
-        <!-- 头部 -->
+      <div class="max-w-7xl mx-auto">
+        <!-- 顶部栏 -->
         <div
           class="flex items-center justify-between mb-8 border-b border-border pb-4"
         >
@@ -119,6 +122,7 @@
               <p class="text-xs text-gray-500">
                 USER: <span class="text-accent">ZZH</span>
               </p>
+              <!-- 登出按钮 -->
               <a
                 href="/admin?action=logout"
                 class="text-[10px] text-red-500 hover:text-red-400 border border-red-900/50 px-2 py-0.5 rounded hover:bg-red-900/20 transition-colors"
@@ -128,7 +132,7 @@
           </div>
           <div class="text-right">
             <div class="text-[10px] text-gray-500 uppercase tracking-wider">
-              Total Visitors
+              Total Unique Visitors
             </div>
             <div class="text-4xl font-bold text-accent">
               {{ total_visitors }}
@@ -136,7 +140,7 @@
           </div>
         </div>
 
-        <!-- 表格 -->
+        <!-- 表格容器 -->
         <div
           class="bg-panel border border-border rounded-lg overflow-hidden shadow-2xl"
         >
@@ -144,22 +148,27 @@
             class="px-4 py-3 border-b border-border bg-white/5 flex justify-between items-center"
           >
             <span class="text-xs font-bold text-white uppercase tracking-wider"
-              >Access Logs</span
+              >Live Traffic Logs</span
             >
-            <span class="text-[10px] text-gray-500">History</span>
+            <span class="text-[10px] text-gray-500">Real-time</span>
           </div>
 
-          <div class="overflow-x-auto max-h-[75vh] scrollbar-hide">
+          <div class="overflow-x-auto max-h-[80vh] scrollbar-hide">
             <table class="w-full text-left text-xs">
-              <thead class="bg-black sticky top-0 z-10">
+              <thead class="bg-black sticky top-0 z-10 shadow-lg">
                 <tr>
                   <th
-                    class="px-4 py-3 font-medium text-gray-500 border-b border-border"
+                    class="px-4 py-3 font-medium text-gray-500 border-b border-border w-40"
                   >
-                    TIME
+                    LAST SEEN
                   </th>
                   <th
-                    class="px-4 py-3 font-medium text-gray-500 border-b border-border"
+                    class="px-4 py-3 font-medium text-gray-500 border-b border-border text-center w-20"
+                  >
+                    VISITS
+                  </th>
+                  <th
+                    class="px-4 py-3 font-medium text-gray-500 border-b border-border w-32"
                   >
                     IP ADDRESS
                   </th>
@@ -169,7 +178,7 @@
                     LOCATION
                   </th>
                   <th
-                    class="px-4 py-3 font-medium text-gray-500 border-b border-border"
+                    class="px-4 py-3 font-medium text-gray-500 border-b border-border text-right"
                   >
                     SESSION ID
                   </th>
@@ -179,22 +188,32 @@
                 {% for record in history %}
                 <tr class="hover:bg-white/5 transition-colors group">
                   <td
-                    class="px-4 py-3 text-gray-400 whitespace-nowrap font-mono"
+                    class="px-4 py-3 text-gray-300 whitespace-nowrap font-mono"
                   >
-                    {{ record.date }}
+                    {{ record.last_seen }}
                   </td>
-                  <td class="px-4 py-3 text-accent font-bold font-mono">
+                  <td
+                    class="px-4 py-3 text-accent font-bold font-mono text-center text-sm"
+                  >
+                    {{ record.visits }}
+                  </td>
+                  <td class="px-4 py-3 text-gray-400 font-mono">
                     {{ record.ip }}
                   </td>
                   <td class="px-4 py-3 text-gray-300">{{ record.location }}</td>
-                  <td class="px-4 py-3 text-gray-600 font-mono text-[10px]">
+                  <td
+                    class="px-4 py-3 text-gray-700 font-mono text-[9px] text-right max-w-[120px] truncate group-hover:text-gray-500 transition-colors"
+                  >
                     {{ record.id }}
                   </td>
                 </tr>
                 {% else %}
                 <tr>
-                  <td colspan="4" class="px-4 py-8 text-center text-gray-600">
-                    NO DATA FOUND
+                  <td
+                    colspan="5"
+                    class="px-4 py-12 text-center text-gray-600 tracking-wider"
+                  >
+                    NO DATA RECORDED
                   </td>
                 </tr>
                 {% endfor %}

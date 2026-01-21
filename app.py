@@ -15,7 +15,8 @@ from datetime import datetime, timedelta
 from film_engine import process_style_v2_with_progress
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
-app.config['SECRET_KEY'] = 'film_lab_pro_secret' # 必须要有这个，session 才能用
+# ★★★ 这个KEY用于加密Session，必须保留 ★★★
+app.config['SECRET_KEY'] = 'film_lab_pro_secret_key_888' 
 CORS(app)
 
 # ==================== Cloudflare 真实 IP 逻辑 ====================
@@ -68,7 +69,7 @@ def init_stats_file():
         with open(STATS_FILE, 'w', encoding='utf-8') as f:
             json.dump({"total_unique_visitors": 0, "history": []}, f, ensure_ascii=False, indent=2)
 
-def record_new_visitor(visitor_id, ip):
+def update_visitor_activity(visitor_id, ip, is_new_cookie=False):
     try:
         if os.path.exists(STATS_FILE):
             with open(STATS_FILE, 'r', encoding='utf-8') as f:
@@ -76,26 +77,51 @@ def record_new_visitor(visitor_id, ip):
         else:
             data = {"total_unique_visitors": 0, "history": []}
 
-        location = get_ip_location(ip)
-        new_record = {
-            "id": visitor_id,
-            "ip": ip,
-            "location": location,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        data["total_unique_visitors"] += 1
-        data["history"].insert(0, new_record)
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        found_record = None
+        for record in data['history']:
+            if record.get('id') == visitor_id:
+                found_record = record
+                break
+        
+        if found_record:
+            # 老访客：更新
+            data['history'].remove(found_record)
+            found_record['visits'] = found_record.get('visits', 1) + 1
+            found_record['last_seen'] = current_time
+            if ip != found_record.get('ip'):
+                found_record['ip'] = ip
+                found_record['location'] = get_ip_location(ip)
+            data['history'].insert(0, found_record)
+        else:
+            # 新访客：插入
+            if is_new_cookie or not found_record:
+                data["total_unique_visitors"] += 1
+            
+            location = get_ip_location(ip)
+            new_record = {
+                "id": visitor_id,
+                "ip": ip,
+                "location": location,
+                "first_seen": current_time,
+                "last_seen": current_time,
+                "visits": 1
+            }
+            data["history"].insert(0, new_record)
+
         if len(data["history"]) > 5000:
             data["history"] = data["history"][:5000]
 
         with open(STATS_FILE, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+            
         return data["total_unique_visitors"]
     except Exception as e:
         print(f"Stats Error: {e}")
         return data.get("total_unique_visitors", 0)
 
-def get_current_count():
+def get_total_count():
     try:
         if os.path.exists(STATS_FILE):
             with open(STATS_FILE, 'r', encoding='utf-8') as f:
@@ -124,47 +150,50 @@ def progress_callback(session_id, step, progress, message):
 @app.route('/')
 def index():
     visitor_id = request.cookies.get('visitor_id')
+    user_ip = get_real_ip()
+    
     if visitor_id is None:
         new_id = str(uuid.uuid4())
-        total = record_new_visitor(new_id, get_real_ip())
+        total = update_visitor_activity(new_id, user_ip, is_new_cookie=True)
         resp = make_response(render_template('index.html', total_visitors="{:,}".format(total)))
         resp.set_cookie('visitor_id', new_id, expires=datetime.now() + timedelta(days=365))
         return resp
     else:
-        return render_template('index.html', total_visitors="{:,}".format(get_current_count()))
+        total = update_visitor_activity(visitor_id, user_ip, is_new_cookie=False)
+        return render_template('index.html', total_visitors="{:,}".format(total))
 
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(app.root_path, 'favicon.ico')
 
-# ★★★ 核心：管理员后台登录逻辑 ★★★
+# ==================== ★★★ 管理员后台逻辑 ★★★ ====================
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
     error = None
     
-    # 1. 退出登录
+    # 1. 如果点击了登出，清除 Session，重定向回 admin (触发登录框)
     if request.args.get('action') == 'logout':
         session.pop('is_admin', None)
         return redirect(url_for('admin_panel'))
 
-    # 2. 处理登录提交
+    # 2. 如果是 POST 请求，说明用户提交了表单
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
         
-        # 强绑定用户名密码
+        # 验证账号密码
         if username == 'zzh' and password == '060312':
-            session['is_admin'] = True
-            return redirect(url_for('admin_panel'))
+            session['is_admin'] = True  # 登录成功，写入 Session
+            return redirect(url_for('admin_panel')) # 刷新页面
         else:
-            error = "ACCESS DENIED: INVALID CREDENTIALS"
+            error = "ACCESS DENIED: INVALID CREDENTIALS" # 错误提示
 
-    # 3. 检查是否已登录
+    # 3. 检查 Session (核心判断)
+    # 如果 Session 里没有 is_admin，说明没登录 -> 显示登录框
     if not session.get('is_admin'):
-        # 未登录，渲染登录页
         return render_template('admin.html', show_login=True, error=error)
 
-    # 4. 已登录，读取数据并渲染表格
+    # 4. 如果代码跑到这里，说明 is_admin 为 True (已登录) -> 显示表格
     data = {"total_unique_visitors": 0, "history": []}
     try:
         if os.path.exists(STATS_FILE):
@@ -174,7 +203,7 @@ def admin_panel():
     
     formatted_total = "{:,}".format(data.get("total_unique_visitors", 0))
     return render_template('admin.html', show_login=False, total_visitors=formatted_total, history=data.get("history", []))
-
+# =================================================================
 
 @app.route('/process', methods=['POST'])
 @limiter.limit("5 per minute")
