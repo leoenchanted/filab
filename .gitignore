@@ -5,3 +5,4 @@ venv/
 .idea/
 .vscode/
 visitor_data.json
+detailed_logs.json

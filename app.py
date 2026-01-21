@@ -15,7 +15,6 @@ from datetime import datetime, timedelta
 from film_engine import process_style_v2_with_progress
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
-# ★★★ 这个KEY用于加密Session，必须保留 ★★★
 app.config['SECRET_KEY'] = 'film_lab_pro_secret_key_888' 
 CORS(app)
 
@@ -45,6 +44,8 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp', 'heic'}
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATS_FILE = os.path.join(BASE_DIR, 'visitor_data.json')
+# ★★★ 新增：详细监控日志文件 ★★★
+LOG_FILE = os.path.join(BASE_DIR, 'detailed_logs.json')
 
 # ==================== IP 位置查询 ====================
 def get_ip_location(ip):
@@ -63,7 +64,63 @@ def get_ip_location(ip):
         pass
     return location
 
-# ==================== 统计功能 ====================
+# ==================== ★★★ 新增：详细日志记录函数 ★★★ ====================
+def save_detailed_log(visitor_id, ip, location):
+    """
+    记录详细的设备信息，用于反爬虫分析
+    """
+    try:
+        # 获取 User-Agent 对象
+        ua = request.user_agent
+        
+        # 构建极其详细的日志条目
+        log_entry = {
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "visitor_id": visitor_id,
+            "ip": ip,
+            "location": location,
+            # === 设备指纹 ===
+            "device_info": {
+                "platform": ua.platform,       # 操作系统 (windows, iphone, android, linux)
+                "browser": ua.browser,         # 浏览器 (chrome, safari)
+                "version": ua.version,         # 版本号
+                "language": request.headers.get('Accept-Language'), # 语言设置 (爬虫通常为空)
+                "is_mobile": ua.platform in ['android', 'iphone', 'ipad'] if ua.platform else False
+            },
+            # === 爬虫判定核心 ===
+            "raw_user_agent": request.headers.get('User-Agent'), # 原始 UA 字符串
+            # === 来源分析 ===
+            "traffic_source": {
+                "referrer": request.referrer,  # 从哪个网页跳转过来的
+                "path": request.path,          # 访问了哪个路径
+                "method": request.method       # GET 还是 POST
+            }
+        }
+
+        # 读取现有的日志列表
+        logs = []
+        if os.path.exists(LOG_FILE):
+            try:
+                with open(LOG_FILE, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+            except:
+                logs = [] # 文件损坏或为空则重置
+
+        # 插入最新一条到最前面
+        logs.insert(0, log_entry)
+
+        # 只保留最近 2000 条详细记录，避免文件无限大占满服务器硬盘
+        if len(logs) > 2000:
+            logs = logs[:2000]
+
+        # 写入文件
+        with open(LOG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+
+    except Exception as e:
+        print(f"Log Error: {e}")
+
+# ==================== 统计功能 (访客计数) ====================
 def init_stats_file():
     if not os.path.exists(STATS_FILE):
         with open(STATS_FILE, 'w', encoding='utf-8') as f:
@@ -79,27 +136,38 @@ def update_visitor_activity(visitor_id, ip, is_new_cookie=False):
 
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
+        # 查找是否存在该 ID
         found_record = None
         for record in data['history']:
             if record.get('id') == visitor_id:
                 found_record = record
                 break
         
+        location = "Unknown" 
+        # 如果是老用户，尝试复用已有地址，减少 API 请求
+        if found_record and found_record.get('ip') == ip:
+            location = found_record.get('location', 'Unknown')
+        else:
+            # IP 变了或者新用户，才去查地址
+            location = get_ip_location(ip)
+
+        # ★★★ 在这里触发详细日志记录 ★★★
+        # 每次用户访问主页，都记录一次详细日志
+        save_detailed_log(visitor_id, ip, location)
+        
         if found_record:
-            # 老访客：更新
+            # 老访客
             data['history'].remove(found_record)
             found_record['visits'] = found_record.get('visits', 1) + 1
             found_record['last_seen'] = current_time
-            if ip != found_record.get('ip'):
-                found_record['ip'] = ip
-                found_record['location'] = get_ip_location(ip)
+            found_record['ip'] = ip
+            found_record['location'] = location
             data['history'].insert(0, found_record)
         else:
-            # 新访客：插入
+            # 新访客
             if is_new_cookie or not found_record:
                 data["total_unique_visitors"] += 1
             
-            location = get_ip_location(ip)
             new_record = {
                 "id": visitor_id,
                 "ip": ip,
@@ -117,17 +185,10 @@ def update_visitor_activity(visitor_id, ip, is_new_cookie=False):
             json.dump(data, f, ensure_ascii=False, indent=2)
             
         return data["total_unique_visitors"]
+
     except Exception as e:
         print(f"Stats Error: {e}")
         return data.get("total_unique_visitors", 0)
-
-def get_total_count():
-    try:
-        if os.path.exists(STATS_FILE):
-            with open(STATS_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f).get("total_unique_visitors", 0)
-    except: pass
-    return 0
 
 init_stats_file()
 
@@ -166,34 +227,26 @@ def index():
 def favicon():
     return send_from_directory(app.root_path, 'favicon.ico')
 
-# ==================== ★★★ 管理员后台逻辑 ★★★ ====================
+# ★★★ 管理员后台 ★★★
 @app.route('/admin', methods=['GET', 'POST'])
 def admin_panel():
     error = None
-    
-    # 1. 如果点击了登出，清除 Session，重定向回 admin (触发登录框)
     if request.args.get('action') == 'logout':
         session.pop('is_admin', None)
         return redirect(url_for('admin_panel'))
 
-    # 2. 如果是 POST 请求，说明用户提交了表单
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        
-        # 验证账号密码
         if username == 'zzh' and password == '060312':
-            session['is_admin'] = True  # 登录成功，写入 Session
-            return redirect(url_for('admin_panel')) # 刷新页面
+            session['is_admin'] = True
+            return redirect(url_for('admin_panel'))
         else:
-            error = "ACCESS DENIED: INVALID CREDENTIALS" # 错误提示
+            error = "ACCESS DENIED: INVALID CREDENTIALS"
 
-    # 3. 检查 Session (核心判断)
-    # 如果 Session 里没有 is_admin，说明没登录 -> 显示登录框
     if not session.get('is_admin'):
         return render_template('admin.html', show_login=True, error=error)
 
-    # 4. 如果代码跑到这里，说明 is_admin 为 True (已登录) -> 显示表格
     data = {"total_unique_visitors": 0, "history": []}
     try:
         if os.path.exists(STATS_FILE):
@@ -203,7 +256,6 @@ def admin_panel():
     
     formatted_total = "{:,}".format(data.get("total_unique_visitors", 0))
     return render_template('admin.html', show_login=False, total_visitors=formatted_total, history=data.get("history", []))
-# =================================================================
 
 @app.route('/process', methods=['POST'])
 @limiter.limit("5 per minute")
